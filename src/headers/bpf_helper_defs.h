@@ -1,5 +1,5 @@
 /* This is auto-generated file. See bpf_doc.py for details. */
-
+#include <linux/types.h>
 /* Forward declarations of BPF structs */
 struct bpf_fib_lookup;
 struct bpf_sk_lookup;

@@ -12,6 +12,7 @@
 #include "./match.h"
 #include "headers/bpf_endian.h"
 #include "headers/bpf_helpers.h"
+
 char __license[] SEC("license") = "Dual MIT/GPL";
 
 SEC("tc/acl")
@@ -20,6 +21,7 @@ int acl_match(struct __sk_buff *skb) {
 	void *data = (void*)(long)skb->data;
 	void *data_end = (void*)(long)skb->data_end;
 	struct match_addr_params addr_param;
+	struct match_integer_params int_param;
 	struct ethhdr *ethhdr;
 	struct iphdr *iph;
 	struct match_res res;
@@ -74,19 +76,36 @@ int acl_match(struct __sk_buff *skb) {
 		return TC_ACT_OK;
 	}
 	res.src = mv;
+
+
+	memset(&int_param, 0, sizeof(int_param));
+
+
+
 	struct data_t log = {
 		.rule_id = {0}
 	};
-	// bpf_printk("ruleid %d %d %d",res.dst->bits[0],res.src->bits[0],res.dst->bits[0]&res.src->bits[0]);
+
+
+	struct action_key a_k;
+	memset(&a_k, 0, sizeof(a_k));
 	for(int i=0;i<8;i++) {
 		log.rule_id[i] =  ((res.dst->bits[i]) & (res.src->bits[i]));
-		if(log.rule_id[i]) {
-			bpf_printk("%llu",log.rule_id[i]);
+		if (log.rule_id[i]) {
+			a_k.offset = i;
+			a_k.bits = log.rule_id[i];
+			res.act_key = a_k;
+			bpf_printk("offset %d bit %llu", i,log.rule_id[i]);
 		}
 	}
-	bpf_perf_event_output(skb,&log_perf,0,&log,sizeof(struct data_t));
-	return TC_ACT_OK;
 
+	struct action_params action_param = {
+		.key = &a_k,
+		.hash_map = &match_action_hash_map
+	};
+
+	bpf_perf_event_output(skb,&log_perf,0,&log,sizeof(struct data_t));
+	return do_action(&action_param);
 }
 
 

@@ -62,8 +62,12 @@ type bpfProgramSpecs struct {
 // It can be passed ebpf.CollectionSpec.Assign.
 type bpfMapSpecs struct {
 	LogPerf             *ebpf.MapSpec `ebpf:"log_perf"`
+	MatchActionHashMap  *ebpf.MapSpec `ebpf:"match_action_hash_map"`
 	MatchAddrDstHashMap *ebpf.MapSpec `ebpf:"match_addr_dst_hash_map"`
 	MatchAddrSrcHashMap *ebpf.MapSpec `ebpf:"match_addr_src_hash_map"`
+	MatchDportHashMap   *ebpf.MapSpec `ebpf:"match_dport_hash_map"`
+	MatchProtoHashMap   *ebpf.MapSpec `ebpf:"match_proto_hash_map"`
+	MatchSportHashMap   *ebpf.MapSpec `ebpf:"match_sport_hash_map"`
 }
 
 // bpfObjects contains all objects after they have been loaded into the kernel.
@@ -86,15 +90,23 @@ func (o *bpfObjects) Close() error {
 // It can be passed to loadBpfObjects or ebpf.CollectionSpec.LoadAndAssign.
 type bpfMaps struct {
 	LogPerf             *ebpf.Map `ebpf:"log_perf"`
+	MatchActionHashMap  *ebpf.Map `ebpf:"match_action_hash_map"`
 	MatchAddrDstHashMap *ebpf.Map `ebpf:"match_addr_dst_hash_map"`
 	MatchAddrSrcHashMap *ebpf.Map `ebpf:"match_addr_src_hash_map"`
+	MatchDportHashMap   *ebpf.Map `ebpf:"match_dport_hash_map"`
+	MatchProtoHashMap   *ebpf.Map `ebpf:"match_proto_hash_map"`
+	MatchSportHashMap   *ebpf.Map `ebpf:"match_sport_hash_map"`
 }
 
 func (m *bpfMaps) Close() error {
 	return _BpfClose(
 		m.LogPerf,
+		m.MatchActionHashMap,
 		m.MatchAddrDstHashMap,
 		m.MatchAddrSrcHashMap,
+		m.MatchDportHashMap,
+		m.MatchProtoHashMap,
+		m.MatchSportHashMap,
 	)
 }
 

@@ -17,12 +17,48 @@ struct action_key {
 	__u64 bits;
 };
 
+struct action_val {
+	__u32 action;
+};
+
+struct match_port {
+	__u32 port;
+};
+
+struct match_proto {
+	__u32 proto;
+};
+
+struct match_cgroup {
+	__u64 cgroup;
+};
+
+struct match_mark {
+	__u32 mark;
+};
+
+struct match_integer_params {
+	union {
+		struct match_port port;
+		struct match_proto proto;
+		struct match_cgroup cgroup;
+		struct match_mark mark;
+	};
+	void *map;
+	struct match_val *val;
+};
+
+struct action_params {
+	struct action_key *key;
+	void *hash_map;
+};
+
 struct match_res {
-	// struct action_key act_key;
+	struct action_key act_key;
 	struct match_val *src;
 	struct match_val *dst;
-	// struct match_val *sport;
-	// struct match_val *dport;
+	struct match_val *sport;
+	struct match_val *dport;
 	// struct match_val *proto;
 	// struct match_val *cgroup;
 	// struct match_val *mark;
@@ -37,8 +73,6 @@ struct match_val {
 struct match_addr_hash {
 	__u32 ip;
 };
-
-
 
 struct match_addr_lpm {
 	__u32 addr;
@@ -86,22 +120,29 @@ struct bpf_map_def SEC("maps") match_addr_dst_hash_map = {
 
 struct bpf_map_def SEC("maps") match_dport_hash_map = {
 	.type = BPF_MAP_TYPE_HASH,
-	.key_size = sizeof(__u32),
+	.key_size = sizeof(struct match_port),
 	.value_size = sizeof(struct match_val),
 	.max_entries = MAX_SIZE
 };
 
 struct bpf_map_def SEC("maps") match_sport_hash_map = {
 	.type = BPF_MAP_TYPE_HASH,
-	.key_size = sizeof(__u32),
+	.key_size = sizeof(struct match_port),
 	.value_size = sizeof(struct match_val),
+	.max_entries = MAX_SIZE
+};
+
+struct bpf_map_def SEC("maps") match_action_hash_map = {
+	.type = BPF_MAP_TYPE_HASH,
+	.key_size = sizeof(struct action_key),
+	.value_size = sizeof(struct action_val),
 	.max_entries = MAX_SIZE
 };
 
 
 struct bpf_map_def SEC("maps") match_proto_hash_map = {
 	.type = BPF_MAP_TYPE_HASH,
-	.key_size = sizeof(__u32),
+	.key_size = sizeof(struct match_proto),
 	.value_size = sizeof(struct match_val),
 	.max_entries = MAX_SIZE
 };

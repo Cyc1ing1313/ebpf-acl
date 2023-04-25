@@ -1,10 +1,9 @@
 package main
 
 import (
+	"acl/rule"
 	"fmt"
 	"log"
-	"math"
-	"net"
 	"time"
 	"unsafe"
 
@@ -16,69 +15,11 @@ import (
 
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang-14 -cflags "-O2 -g -Wall -Werror" bpf ./src/acl.c -- -I ./src/headers
 // const mapKey uint32 = 0
-func IP2Uint8Arr(ip net.IP) [4]uint8 {
-	arr := [4]uint8{}
-	for i, v := range ip {
-		arr[i] = v
-	}
-	return arr
-}
-
-func uint82uint32(b [4]uint8) uint32 {
-	return uint32(b[3]) | uint32(b[2])<<8 | uint32(b[1])<<16 | uint32(b[0])<<24
-}
-
-type LPMKey struct {
-	prefixlen uint32
-	addr      [4]uint8
-}
-
-type AddrHash struct {
-	IP uint32
-}
-
-type MatchVal struct {
-	Bits [8]uint64
-}
-
-type BitMap [8]uint64
-
-func (b *BitMap) Set(offset int) {
-	if offset >= 8*64 {
-		return
-	}
-	b[offset/64] = (b[offset/64] | (1 << (64 - (offset % 64) - 1)))
-}
-
-func (b *BitMap) ToOffSet() int {
-	for i := 0; i < 8; i++ {
-		if b[i] > 0 {
-			return i*64 + (63 - int(math.Log2(float64(b[i]&(-b[i])))))
-		}
-	}
-	return -1
-}
-
-func (b *BitMap) Print() {
-	for i := 0; i < 8; i++ {
-		fmt.Printf("%b\n", b[i])
-	}
-}
-
-func (b *BitMap) Clear(offset int) {
-
-}
 
 func main() {
-	// Name of the kernel function to trace.
-	// fn := "sys_execve"
-
-	// Allow the current process to lock memory for eBPF resources.
 	if err := rlimit.RemoveMemlock(); err != nil {
 		log.Fatal(err)
 	}
-
-	// Load pre-compiled programs and maps into the kernel.
 	objs := bpfObjects{}
 	if err := loadBpfObjects(&objs, nil); err != nil {
 		log.Fatalf("loading objects: %v", err)
@@ -118,32 +59,22 @@ func main() {
 	}
 	defer netlink.FilterDel(filter)
 
-	bits := BitMap{}
-	bits.Set(23)
-
-	err = objs.bpfMaps.MatchAddrSrcHashMap.Put(AddrHash{
-		IP: uint82uint32(IP2Uint8Arr(net.ParseIP("20.1.0.10").To4())),
-	}, MatchVal{
-		Bits: bits,
-	})
-	if err != nil {
-		fmt.Printf("bpf map set error %+v", err)
-		return
+	rule1 := rule.Rule{
+		ID:     1,
+		Sip:    []string{"20.1.0.10"},
+		Dip:    []string{"20.1.0.11"},
+		Action: 2,
 	}
 
-	err = objs.bpfMaps.MatchAddrDstHashMap.Put(AddrHash{
-		IP: uint82uint32(IP2Uint8Arr(net.ParseIP("20.1.0.11").To4())),
-	}, MatchVal{
-		Bits: bits,
-	})
-	if err != nil {
-		fmt.Printf("bpf map set error %+v", err)
-		return
-	}
+	rule1.LoadAction(objs.bpfMaps.MatchActionHashMap)
+	rule1.LoadSip(objs.bpfMaps.MatchAddrSrcHashMap)
+	rule1.LoadDip(objs.bpfMaps.MatchAddrDstHashMap)
+	// rule1.LoadDport(objs.bpfMaps.MatchDportHashMap)
+	// rule1.LoadSport(objs.bpfMaps.MatchSportHashMap)
 
 	itr := objs.bpfMaps.MatchAddrSrcHashMap.Iterate()
-	key := AddrHash{}
-	val := MatchVal{}
+	key := rule.AddrHash{}
+	val := rule.MatchVal{}
 	for itr.Next(&key, &val) {
 		fmt.Printf("src %+v %+v \n", key, val)
 	}
@@ -152,30 +83,8 @@ func main() {
 	for itr.Next(&key, &val) {
 		fmt.Printf("dst %+v %+v \n", key, val)
 	}
-	// r, err := perf.NewReader(objs.LogPerfEventArr, 1)
-	// if err != nil {
-	// 	fmt.Printf("NewReader error: %+v", err)
-	// }
-
-	// Open a Kprobe at the entry point of the kernel function and attach the
-	// pre-compiled program. Each time the kernel function enters, the program
-	// will increment the execution counter by 1. The read loop below polls this
-	// map value once per second.
-	// kp, err := link.Kprobe(fn, objs.KprobeExecve, nil)
-	// if err != nil {
-	// 	log.Fatalf("opening kprobe: %s", err)
-	// }
-	// defer kp.Close()
-
-	// Read loop reporting the total amount of times the kernel
-	// function was entered, once per second.
-	// ticker := time.NewTicker(1 * time.Second)
-	// defer ticker.Stop()
-
-	// log.Println("Waiting for events..")
-
 	type Log struct {
-		ID BitMap
+		ID rule.BitMap
 	}
 	reader, err := perf.NewReader(objs.bpfMaps.LogPerf, 4096)
 	if err != nil {
